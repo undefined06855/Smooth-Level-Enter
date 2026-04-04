@@ -8,13 +8,13 @@
     },
 
     "version": "v1.0.0",
-    "id": "undefined0.smooth-transitions",
-    "name": "Smooth Transitions",
+    "id": "undefined0.smooth-level-enter",
+    "name": "Smooth Level Enter",
     "developer": "undefined0",
-    "description": "",
-    "tags": [],
+    "description": "Smoooooothly transition into playing a level!",
+    "tags": [ "gameplay", "enhancement" ],
 
     "links": {
-        "source": "https://github.com/undefined06855/example-mod"
+        "source": "https://github.com/undefined06855/Smooth-Level-Enter"
     }
 }
