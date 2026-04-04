@@ -18,8 +18,6 @@ void CCTransitionPlayLayer::onEnter() {
     m_pInScene->resumeSchedulerAndActions(); // call instead of onEnter
     setFakeIsRunningRecursive(m_pInScene, true);
 
-    m_fDuration = 1.f;
-
     auto playLayer = m_pInScene->getChildByType<PlayLayer>(0);
     playLayer->setVisible(true);
 
@@ -39,6 +37,16 @@ void CCTransitionPlayLayer::onEnter() {
 
     playLayer->m_groundLayer2->setPositionY(playLayer->m_groundLayer2->getPositionY() + 120.f);
     playLayer->m_groundLayer2->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCMoveBy::create(m_fDuration, { 0.f, -120.f })));
+
+    auto mgSprites = cocos2d::CCArray::create();
+    mgSprites->addObjectsFromArray(playLayer->m_middleground->m_mg1BatchNode->getChildren());
+    mgSprites->addObjectsFromArray(playLayer->m_middleground->m_mg2BatchNode->getChildren());
+    for (auto sprite : geode::cocos::CCArrayExt<cocos2d::CCSprite>(mgSprites)) {
+        sprite->setOpacity(0);
+        sprite->setPositionX(sprite->getPositionX() + 500.f);
+        sprite->runAction(cocos2d::CCFadeIn::create(m_fDuration));
+        sprite->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCMoveBy::create(m_fDuration, { -500.f, 0.f })));
+    }
 
     playLayer->m_attemptLabel->setOpacity(0);
     playLayer->m_attemptLabel->runAction(cocos2d::CCFadeIn::create(m_fDuration));
@@ -63,6 +71,19 @@ void CCTransitionPlayLayer::onEnter() {
     playLayer->m_infoLabel->setPositionX(playLayer->m_infoLabel->getPositionX() - 50.f);
     playLayer->m_infoLabel->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCMoveBy::create(m_fDuration, { 50.f, 0.f })));
 
+    // likely not onscreen but should animate anyway
+    auto origP1Scale = playLayer->m_player1->getScale(); // may not be 1 if the player starts as mini
+    playLayer->m_player1->setScale(0.f);
+    playLayer->m_player1->setRotation(-20.f);
+    playLayer->m_player1->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCScaleTo::create(m_fDuration, origP1Scale)));
+    playLayer->m_player1->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCRotateTo::create(m_fDuration, 0.f)));
+
+    auto origP2Scale = playLayer->m_player2->getScale();
+    playLayer->m_player2->setScale(0.f);
+    playLayer->m_player2->setRotation(20.f);
+    playLayer->m_player2->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCScaleTo::create(m_fDuration, origP2Scale)));
+    playLayer->m_player2->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCRotateTo::create(m_fDuration, 0.f)));
+
     // objects
     auto screenWidth = cocos2d::CCDirector::get()->getWinSize().width;
 
@@ -71,20 +92,37 @@ void CCTransitionPlayLayer::onEnter() {
         if (!obj->getParent()) continue;
 
         obj->setPosition(obj->getPosition() + cocos2d::CCPoint{ 100.f, -300.f });
-        GLubyte origOpacity = obj->getOpacity();
+
+        auto origOpacity = obj->getOpacity();
         obj->setOpacity(0);
+
+        obj->setRotation(obj->getRotation() + 50.f);
+
+        auto origScaleX = obj->getScaleX();
+        auto origScaleY = obj->getScaleY();
+        obj->setScale(0.f);
 
         auto percentage = obj->getParent()->convertToWorldSpace(obj->getPosition()).x / screenWidth;
 
+        // half the time is spent animating across the screen, and each object takes half the time to animate to its final pos
         obj->runAction(cocos2d::CCSequence::createWithTwoActions(
             cocos2d::CCDelayTime::create(percentage * .5f * m_fDuration),
             cocos2d::CCSpawn::create(
                 cocos2d::CCEaseBounceOut::create(cocos2d::CCMoveBy::create(.5f * m_fDuration, { -100.f, 0.f })),
                 cocos2d::CCEaseExponentialOut::create(cocos2d::CCMoveBy::create(.5f * m_fDuration, { 0.f, 300.f })),
+                cocos2d::CCEaseExponentialOut::create(cocos2d::CCScaleTo::create(.5f * m_fDuration, origScaleX, origScaleY)),
+                cocos2d::CCEaseExponentialOut::create(cocos2d::CCRotateBy::create(.5f * m_fDuration, -50.f)),
                 cocos2d::CCFadeTo::create(.5f * m_fDuration, origOpacity),
                 nullptr
             )
         ));
+    }
+
+    // gradients
+    for (auto [i, gradient] : geode::cocos::CCDictionaryExt<int, GJGradientLayer>(playLayer->m_gradientLayers)) {
+        auto origOpacity = gradient->getOpacity();
+        gradient->setOpacity(0);
+        gradient->runAction(cocos2d::CCFadeTo::create(m_fDuration, origOpacity));
     }
 
     this->runAction(cocos2d::CCSequence::createWithTwoActions(
