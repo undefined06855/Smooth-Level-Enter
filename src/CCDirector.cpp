@@ -2,7 +2,7 @@
 #include "CCTransitionPlayLayer.hpp"
 
 void HookedCCDirector::onModify(auto& self) {
-    (void)self.setHookPriorityPost("cocos2d::CCDirector::replaceScene", geode::Priority::Replace);
+    (void)self.setHookPriorityPost("cocos2d::CCDirector::replaceScene", geode::Priority::Last);
 }
 
 bool HookedCCDirector::replaceScene(cocos2d::CCScene* scene) {
