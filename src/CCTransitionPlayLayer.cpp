@@ -38,14 +38,16 @@ void CCTransitionPlayLayer::onEnter() {
     playLayer->m_groundLayer2->setPositionY(playLayer->m_groundLayer2->getPositionY() + 120.f);
     playLayer->m_groundLayer2->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCMoveBy::create(m_fDuration, { 0.f, -120.f })));
 
-    auto mgSprites = cocos2d::CCArray::create();
-    mgSprites->addObjectsFromArray(playLayer->m_middleground->m_mg1BatchNode->getChildren());
-    mgSprites->addObjectsFromArray(playLayer->m_middleground->m_mg2BatchNode->getChildren());
-    for (auto sprite : geode::cocos::CCArrayExt<cocos2d::CCSprite>(mgSprites)) {
-        sprite->setOpacity(0);
-        sprite->setPositionX(sprite->getPositionX() + 500.f);
-        sprite->runAction(cocos2d::CCFadeIn::create(m_fDuration));
-        sprite->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCMoveBy::create(m_fDuration, { -500.f, 0.f })));
+    if (playLayer->m_middleground) {
+        auto mgSprites = cocos2d::CCArray::create();
+        mgSprites->addObjectsFromArray(playLayer->m_middleground->m_mg1BatchNode->getChildren());
+        mgSprites->addObjectsFromArray(playLayer->m_middleground->m_mg2BatchNode->getChildren());
+        for (auto sprite : geode::cocos::CCArrayExt<cocos2d::CCSprite>(mgSprites)) {
+            sprite->setOpacity(0);
+            sprite->setPositionX(sprite->getPositionX() + 500.f);
+            sprite->runAction(cocos2d::CCFadeIn::create(m_fDuration));
+            sprite->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCMoveBy::create(m_fDuration, { -500.f, 0.f })));
+        }
     }
 
     playLayer->m_attemptLabel->setOpacity(0);
