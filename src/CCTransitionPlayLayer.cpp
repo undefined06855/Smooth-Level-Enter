@@ -1,5 +1,7 @@
 #include "CCTransitionPlayLayer.hpp"
 
+// forces actions to run even though they're technically not the active scene
+// "running" is cocos speak for currently active and visible
 void setFakeIsRunningRecursive(cocos2d::CCNode* node, bool isRunning) {
     node->m_bRunning = isRunning;
     for (auto child : node->getChildrenExt()) {
@@ -7,7 +9,7 @@ void setFakeIsRunningRecursive(cocos2d::CCNode* node, bool isRunning) {
     }
 }
 
-// let me typeinfo_cast to mh status::Manager
+// let me typeinfo_cast to megahack status::Manager
 namespace status { class Manager : public cocos2d::CCNode {}; }
 
 void CCTransitionPlayLayer::onEnter() {
@@ -24,6 +26,9 @@ void CCTransitionPlayLayer::onEnter() {
 
     auto playLayer = m_pInScene->getChildByType<PlayLayer>(0);
     playLayer->setVisible(true);
+
+    bool isPlayer2Running = playLayer->m_player2->isRunning();
+    setFakeIsRunningRecursive(playLayer->m_player2, true);
 
     auto rewindBackground = playLayer->getChildByID("undefined0.rewind/bg-gradient");
     if (rewindBackground) rewindBackground->setVisible(false);
@@ -60,12 +65,14 @@ void CCTransitionPlayLayer::onEnter() {
     playLayer->m_uiLayer->setScale(0.f);
     playLayer->m_uiLayer->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCScaleTo::create(m_fDuration, 1.f)));
 
-    auto mh = playLayer->getChildByType<status::Manager>(0);
-    if (mh) {
-        mh->setAnchorPoint({ .5f, .5f });
-        mh->setPosition(cocos2d::CCDirector::get()->getWinSize() / 2.f);
-        mh->setScale(0.f);
-        mh->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCScaleTo::create(m_fDuration, 1.f)));
+    // mh ui isnt in m_uiLayer for whatever reason
+    // make sure to copy the animations used for m_uiLayer
+    auto megahackUI = playLayer->getChildByType<status::Manager>(0);
+    if (megahackUI) {
+        megahackUI->setAnchorPoint({ .5f, .5f });
+        megahackUI->setPosition(cocos2d::CCDirector::get()->getWinSize() / 2.f);
+        megahackUI->setScale(0.f);
+        megahackUI->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCScaleTo::create(m_fDuration, 1.f)));
     }
 
     playLayer->m_progressBar->setPositionY(playLayer->m_progressBar->getPositionY() + 30.f);
@@ -135,13 +142,18 @@ void CCTransitionPlayLayer::onEnter() {
         cocos2d::CCDelayTime::create(m_fDuration),
 
         // cleanup
-        geode::cocos::CallFuncExt::create([this, rewindBackground] {
+        geode::cocos::CallFuncExt::create([this, rewindBackground, playLayer, isPlayer2Running] {
             setFakeIsRunningRecursive(m_pInScene, false);
 
             CCTransitionScene::finish();
             if (rewindBackground) rewindBackground->setVisible(true);
+            if (!isPlayer2Running) setFakeIsRunningRecursive(playLayer->m_player2, false);
         })
     ));
+
+    playLayer->updateShaderLayer(1.f / 60.f);
+
+    this->scheduleUpdate();
 }
 
 void CCTransitionPlayLayer::onExit() {
