@@ -33,7 +33,8 @@ void CCTransitionPlayLayer::onEnter() {
     auto rewindBackground = playLayer->getChildByID("undefined0.rewind/bg-gradient");
     if (rewindBackground) rewindBackground->setVisible(false);
 
-    // static animations
+    // m_pInScene animations below (playlayer)
+
     playLayer->m_background->setBlendFunc({ GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA });
     playLayer->m_background->setOpacity(0);
     playLayer->m_background->runAction(cocos2d::CCSequence::createWithTwoActions(
@@ -136,6 +137,70 @@ void CCTransitionPlayLayer::onEnter() {
         auto origOpacity = gradient->getOpacity();
         gradient->setOpacity(0);
         gradient->runAction(cocos2d::CCFadeTo::create(m_fDuration, origOpacity));
+    }
+
+    // m_pOutScene animations below
+
+    if (geode::Mod::get()->getSettingValue<bool>("animate-level-page")) {
+        std::vector<cocos2d::CCNode*> up;
+        std::vector<cocos2d::CCNode*> down;
+        std::vector<cocos2d::CCNode*> left;
+        std::vector<cocos2d::CCNode*> right;
+
+        // levelinfolayer animation
+        auto levelInfoLayer = m_pOutScene->getChildByType<LevelInfoLayer>(0);
+        if (levelInfoLayer) {
+            if (auto node = levelInfoLayer->getChildByID("copy-indicator")) up.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("length-icon")) right.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("downloads-icon")) right.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("orbs-icon")) right.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("likes-icon")) right.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("downloads-label")) right.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("length-label")) right.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("exact-length-label")) right.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("likes-label")) right.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("orbs-label")) right.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("stars-icon")) left.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("stars-label")) left.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("custom-songs-widget")) down.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("left-side-menu")) left.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("bottom-left-art")) left.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("bottom-right-art")) right.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("back-menu")) left.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("right-side-menu")) right.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("other-menu")) down.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("settings-menu")) down.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("creator-info-menu")) up.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("play-menu")) up.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("difficulty-sprite")) left.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("normal-mode-bar")) down.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("practice-mode-bar")) down.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("normal-mode-percentage")) down.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("practice-mode-percentage")) down.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("normal-mode-label")) down.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("practice-mode-label")) down.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("high-object-indicator")) up.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("title-label")) up.push_back(node);
+            if (auto node = levelInfoLayer->getChildByID("garage-menu")) up.push_back(node);
+        }
+
+        auto levelSelectLayer = m_pOutScene->getChildByType<LevelSelectLayer>(0);
+        if (levelSelectLayer) {
+            if (auto node = levelSelectLayer->getChildByID("ground-layer")) down.push_back(node);
+            if (auto node = levelSelectLayer->getChildByID("levels-list")) up.push_back(node);
+            if (auto node = levelSelectLayer->getChildByID("bottom-center-menu")) down.push_back(node);
+            if (auto node = levelSelectLayer->getChildByID("info-menu")) right.push_back(node);
+            if (auto node = levelSelectLayer->getChildByID("top-bar-sprite")) up.push_back(node);
+            if (auto node = levelSelectLayer->getChildByID("bottom-left-corner")) left.push_back(node);
+            if (auto node = levelSelectLayer->getChildByID("bottom-right-corner")) right.push_back(node);
+            if (auto node = levelSelectLayer->getChildByID("back-menu")) left.push_back(node);
+            if (auto node = levelSelectLayer->getChildByID("arrows-menu")) up.push_back(node);
+        }
+
+        for (auto node : up) node->runAction(cocos2d::CCEaseExponentialIn::create(cocos2d::CCMoveBy::create(m_fDuration, { 0.f, 150.f })));
+        for (auto node : down) node->runAction(cocos2d::CCEaseExponentialIn::create(cocos2d::CCMoveBy::create(m_fDuration, { 0.f, -150.f })));
+        for (auto node : left) node->runAction(cocos2d::CCEaseExponentialIn::create(cocos2d::CCMoveBy::create(m_fDuration, { -150.f, 0.f })));
+        for (auto node : right) node->runAction(cocos2d::CCEaseExponentialIn::create(cocos2d::CCMoveBy::create(m_fDuration, { 150.f, 0.f })));
     }
 
     this->runAction(cocos2d::CCSequence::createWithTwoActions(

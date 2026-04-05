@@ -1,4 +1,7 @@
 # Smooth Level Enter
+## v1.0.4
+- Added an option to animate out the level page (suggested by @skip_way)
+
 ## v1.0.3
 - Fixed player 2 being broken initially for levels that didn't start as dual
 - Fixed shaders sometimes not looking accurate to the level start
