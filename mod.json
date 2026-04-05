@@ -16,5 +16,14 @@
 
     "links": {
         "source": "https://github.com/undefined06855/Smooth-Level-Enter"
+    },
+
+    "settings": {
+        "override-length": {
+            "name": "Override Length",
+            "type": "bool",
+            "description": "Overrides the length of the transition to force it to be 1 second, regardless of any other mod or ingame setting.",
+            "default": true
+        }
     }
 }

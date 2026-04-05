@@ -13,6 +13,10 @@ namespace status { class Manager : public cocos2d::CCNode {}; }
 void CCTransitionPlayLayer::onEnter() {
     CCScene::onEnter();
 
+    if (geode::Mod::get()->getSettingValue<bool>("override-length")) {
+        m_fDuration = 1.f;
+    }
+
     cocos2d::CCTouchDispatcher::get()->setDispatchEvents(false);
     m_pOutScene->onExitTransitionDidStart();
     m_pInScene->resumeSchedulerAndActions(); // call instead of onEnter
