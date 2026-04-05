@@ -145,7 +145,10 @@ void CCTransitionPlayLayer::onExit() {
 
     cocos2d::CCTouchDispatcher::get()->setDispatchEvents(true);
 
-    m_pOutScene->onExit();
     m_pInScene->onEnter();
+
+    cocos2d::CCDirector::get()->willSwitchToScene(m_pInScene);
+
+    m_pOutScene->onExit();
     m_pInScene->onEnterTransitionDidFinish();
 }

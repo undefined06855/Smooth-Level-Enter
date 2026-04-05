@@ -1,4 +1,7 @@
 # Smooth Level Enter
+## v1.0.2
+- Fix a crash when completing a quest (and improve mod compatibility in general)
+
 ## v1.0.1
 - Fix levels that don't have a middleground from crashing
 
