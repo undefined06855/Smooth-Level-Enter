@@ -1,4 +1,11 @@
 # Smooth Level Enter
+## v1.0.5
+- Added support for The Vault of Secrets, The Tower, GDGuesser's level page and Soggy Icon's settings page for animating out
+- Enabled the animate out setting by default
+- Fixed skewed objects resetting their skew
+- Changed default easing to Exponential Out and added Bounce Out easing as a legacy option in the mod settings
+- Adjusted other easings, timings and distances slightly
+
 ## v1.0.4
 - Added an option to animate out the level page (suggested by @skip_way)
 

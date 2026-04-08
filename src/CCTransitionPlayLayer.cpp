@@ -9,8 +9,9 @@ void setFakeIsRunningRecursive(cocos2d::CCNode* node, bool isRunning) {
     }
 }
 
-// let me typeinfo_cast to megahack status::Manager
-namespace status { class Manager : public cocos2d::CCNode {}; }
+namespace status { class Manager : public cocos2d::CCNode {}; } // megahack status
+class LevelLayer : public cocos2d::CCNode {}; // gdguesser level page
+class ModSettingsPopup : public cocos2d::CCNode {}; // geode settings popup
 
 void CCTransitionPlayLayer::onEnter() {
     CCScene::onEnter();
@@ -26,6 +27,8 @@ void CCTransitionPlayLayer::onEnter() {
 
     auto playLayer = m_pInScene->getChildByType<PlayLayer>(0);
     playLayer->setVisible(true);
+    playLayer->updateVisibility(1.f / 60.f);
+    playLayer->updateShaderLayer(1.f / 60.f);
 
     bool isPlayer2Running = playLayer->m_player2->isRunning();
     setFakeIsRunningRecursive(playLayer->m_player2, true);
@@ -100,32 +103,43 @@ void CCTransitionPlayLayer::onEnter() {
 
     // objects
     auto screenWidth = cocos2d::CCDirector::get()->getWinSize().width;
+    bool useLegacyEase = geode::Mod::get()->getSettingValue<bool>("legacy-easing");
 
     for (int i = 0; i < playLayer->m_activeObjectsCount; i++) {
         auto obj = playLayer->m_activeObjects[i];
-        if (!obj->getParent()) continue;
+        if (!obj || !obj->getParent()) continue;
 
-        obj->setPosition(obj->getPosition() + cocos2d::CCPoint{ 100.f, -300.f });
+        obj->setPosition(obj->getPosition() + cocos2d::CCPoint{ 50.f, -100.f });
 
         auto origOpacity = obj->getOpacity();
         obj->setOpacity(0);
 
-        obj->setRotation(obj->getRotation() + 50.f);
+        auto origRotationX = obj->getRotationX();
+        auto origRotationY = obj->getRotationY();
+        obj->setRotationX(origRotationX + 50.f);
+        obj->setRotationY(origRotationY + 50.f);
 
         auto origScaleX = obj->getScaleX();
         auto origScaleY = obj->getScaleY();
-        obj->setScale(0.f);
+        obj->setScaleX(0.f);
+        obj->setScaleY(0.f);
 
         auto percentage = obj->getParent()->convertToWorldSpace(obj->getPosition()).x / screenWidth;
+
+        // use legacy ccbounceout if set, else use just exponential out
+        auto createBlockXEase = [useLegacyEase](cocos2d::CCActionInterval* action) -> cocos2d::CCActionInterval* {
+            if (useLegacyEase) return cocos2d::CCEaseBounceOut::create(action);
+            else return cocos2d::CCEaseSineOut::create(action);
+        };
 
         // half the time is spent animating across the screen, and each object takes half the time to animate to its final pos
         obj->runAction(cocos2d::CCSequence::createWithTwoActions(
             cocos2d::CCDelayTime::create(percentage * .5f * m_fDuration),
             cocos2d::CCSpawn::create(
-                cocos2d::CCEaseBounceOut::create(cocos2d::CCMoveBy::create(.5f * m_fDuration, { -100.f, 0.f })),
-                cocos2d::CCEaseExponentialOut::create(cocos2d::CCMoveBy::create(.5f * m_fDuration, { 0.f, 300.f })),
-                cocos2d::CCEaseExponentialOut::create(cocos2d::CCScaleTo::create(.5f * m_fDuration, origScaleX, origScaleY)),
-                cocos2d::CCEaseExponentialOut::create(cocos2d::CCRotateBy::create(.5f * m_fDuration, -50.f)),
+                createBlockXEase(cocos2d::CCMoveBy::create(.5f * m_fDuration, { -50.f, 0.f })),
+                cocos2d::CCEaseExponentialOut::create(cocos2d::CCMoveBy::create(.5f * m_fDuration, { 0.f, 100.f })),
+                cocos2d::CCEaseSineOut::create(cocos2d::CCScaleTo::create(.5f * m_fDuration, origScaleX, origScaleY)),
+                cocos2d::CCEaseSineOut::create(cocos2d::CCRotateBy::create(.5f * m_fDuration, -50.f, -50.f)),
                 cocos2d::CCFadeTo::create(.5f * m_fDuration, origOpacity),
                 nullptr
             )
@@ -139,68 +153,8 @@ void CCTransitionPlayLayer::onEnter() {
         gradient->runAction(cocos2d::CCFadeTo::create(m_fDuration, origOpacity));
     }
 
-    // m_pOutScene animations below
-
-    if (geode::Mod::get()->getSettingValue<bool>("animate-level-page")) {
-        std::vector<cocos2d::CCNode*> up;
-        std::vector<cocos2d::CCNode*> down;
-        std::vector<cocos2d::CCNode*> left;
-        std::vector<cocos2d::CCNode*> right;
-
-        // levelinfolayer animation
-        auto levelInfoLayer = m_pOutScene->getChildByType<LevelInfoLayer>(0);
-        if (levelInfoLayer) {
-            if (auto node = levelInfoLayer->getChildByID("copy-indicator")) up.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("length-icon")) right.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("downloads-icon")) right.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("orbs-icon")) right.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("likes-icon")) right.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("downloads-label")) right.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("length-label")) right.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("exact-length-label")) right.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("likes-label")) right.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("orbs-label")) right.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("stars-icon")) left.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("stars-label")) left.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("custom-songs-widget")) down.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("left-side-menu")) left.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("bottom-left-art")) left.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("bottom-right-art")) right.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("back-menu")) left.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("right-side-menu")) right.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("other-menu")) down.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("settings-menu")) down.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("creator-info-menu")) up.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("play-menu")) up.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("difficulty-sprite")) left.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("normal-mode-bar")) down.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("practice-mode-bar")) down.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("normal-mode-percentage")) down.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("practice-mode-percentage")) down.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("normal-mode-label")) down.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("practice-mode-label")) down.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("high-object-indicator")) up.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("title-label")) up.push_back(node);
-            if (auto node = levelInfoLayer->getChildByID("garage-menu")) up.push_back(node);
-        }
-
-        auto levelSelectLayer = m_pOutScene->getChildByType<LevelSelectLayer>(0);
-        if (levelSelectLayer) {
-            if (auto node = levelSelectLayer->getChildByID("ground-layer")) down.push_back(node);
-            if (auto node = levelSelectLayer->getChildByID("levels-list")) up.push_back(node);
-            if (auto node = levelSelectLayer->getChildByID("bottom-center-menu")) down.push_back(node);
-            if (auto node = levelSelectLayer->getChildByID("info-menu")) right.push_back(node);
-            if (auto node = levelSelectLayer->getChildByID("top-bar-sprite")) up.push_back(node);
-            if (auto node = levelSelectLayer->getChildByID("bottom-left-corner")) left.push_back(node);
-            if (auto node = levelSelectLayer->getChildByID("bottom-right-corner")) right.push_back(node);
-            if (auto node = levelSelectLayer->getChildByID("back-menu")) left.push_back(node);
-            if (auto node = levelSelectLayer->getChildByID("arrows-menu")) up.push_back(node);
-        }
-
-        for (auto node : up) node->runAction(cocos2d::CCEaseExponentialIn::create(cocos2d::CCMoveBy::create(m_fDuration, { 0.f, 150.f })));
-        for (auto node : down) node->runAction(cocos2d::CCEaseExponentialIn::create(cocos2d::CCMoveBy::create(m_fDuration, { 0.f, -150.f })));
-        for (auto node : left) node->runAction(cocos2d::CCEaseExponentialIn::create(cocos2d::CCMoveBy::create(m_fDuration, { -150.f, 0.f })));
-        for (auto node : right) node->runAction(cocos2d::CCEaseExponentialIn::create(cocos2d::CCMoveBy::create(m_fDuration, { 150.f, 0.f })));
+    if (geode::Mod::get()->getSettingValue<bool>("animate-out-level-page")) {
+        this->animateOutScene();
     }
 
     this->runAction(cocos2d::CCSequence::createWithTwoActions(
@@ -215,10 +169,6 @@ void CCTransitionPlayLayer::onEnter() {
             if (!isPlayer2Running) setFakeIsRunningRecursive(playLayer->m_player2, false);
         })
     ));
-
-    playLayer->updateShaderLayer(1.f / 60.f);
-
-    this->scheduleUpdate();
 }
 
 void CCTransitionPlayLayer::onExit() {
@@ -232,4 +182,136 @@ void CCTransitionPlayLayer::onExit() {
 
     m_pOutScene->onExit();
     m_pInScene->onEnterTransitionDidFinish();
+}
+
+void CCTransitionPlayLayer::animateOutScene() {
+    std::vector<cocos2d::CCNode*> up;
+    std::vector<cocos2d::CCNode*> down;
+    std::vector<cocos2d::CCNode*> left;
+    std::vector<cocos2d::CCNode*> right;
+    std::vector<cocos2d::CCNode*> scale;
+
+    auto fixMenuAnchorPoint = [](cocos2d::CCNode* menu) {
+        if (!menu) return;
+
+        std::vector<cocos2d::CCPoint> positions;
+        for (int i = 0; i < menu->getChildrenCount(); i++) positions.push_back(menu->convertToWorldSpace(menu->getChildByIndex(i)->getPosition()));
+
+        menu->ignoreAnchorPointForPosition(false);
+        menu->setPosition(cocos2d::CCDirector::get()->getWinSize() / 2.f);
+
+        for (int i = 0; i < menu->getChildrenCount(); i++) menu->getChildByIndex(i)->setPosition(menu->convertToNodeSpace(positions[i]));
+    };
+
+    auto levelInfoLayer = m_pOutScene->getChildByType<LevelInfoLayer>(0);
+    if (levelInfoLayer) {
+        if (auto node = levelInfoLayer->getChildByID("copy-indicator")) up.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("length-icon")) right.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("downloads-icon")) right.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("orbs-icon")) right.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("likes-icon")) right.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("downloads-label")) right.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("length-label")) right.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("exact-length-label")) right.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("likes-label")) right.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("orbs-label")) right.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("stars-icon")) left.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("stars-label")) left.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("custom-songs-widget")) down.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("left-side-menu")) left.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("bottom-left-art")) left.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("bottom-right-art")) right.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("back-menu")) left.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("right-side-menu")) right.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("other-menu")) scale.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("settings-menu")) down.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("creator-info-menu")) up.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("play-menu")) scale.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("difficulty-sprite")) left.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("normal-mode-bar")) down.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("practice-mode-bar")) down.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("normal-mode-percentage")) down.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("practice-mode-percentage")) down.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("normal-mode-label")) down.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("practice-mode-label")) down.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("high-object-indicator")) up.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("title-label")) up.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("garage-menu")) up.push_back(node);
+
+        fixMenuAnchorPoint(levelInfoLayer->getChildByID("play-menu"));
+    }
+
+    auto levelSelectLayer = m_pOutScene->getChildByType<LevelSelectLayer>(0);
+    if (levelSelectLayer) {
+        if (auto node = levelSelectLayer->getChildByID("ground-layer")) down.push_back(node);
+        if (auto node = levelSelectLayer->getChildByID("levels-list")) scale.push_back(node);
+        if (auto node = levelSelectLayer->getChildByID("bottom-center-menu")) down.push_back(node);
+        if (auto node = levelSelectLayer->getChildByID("info-menu")) right.push_back(node);
+        if (auto node = levelSelectLayer->getChildByID("top-bar-sprite")) up.push_back(node);
+        if (auto node = levelSelectLayer->getChildByID("bottom-left-corner")) left.push_back(node);
+        if (auto node = levelSelectLayer->getChildByID("bottom-right-corner")) right.push_back(node);
+        if (auto node = levelSelectLayer->getChildByID("back-menu")) left.push_back(node);
+        if (auto node = levelSelectLayer->getChildByID("arrows-menu")) scale.push_back(node);
+
+        fixMenuAnchorPoint(levelSelectLayer->getChildByID("arrows-menu"));
+    }
+
+    auto levelAreaInnerLayer = m_pOutScene->getChildByType<LevelAreaInnerLayer>(0);
+    if (levelAreaInnerLayer) {
+        auto mainNode = levelAreaInnerLayer->getChildByType<cocos2d::CCNode>(0);
+
+        if (auto node = mainNode->getChildByID("background")) down.push_back(node);
+        if (auto node = mainNode->getChildByID("left-torch-flame")) left.push_back(node);
+        if (auto node = mainNode->getChildByID("right-torch-flame")) right.push_back(node);
+        if (auto node = mainNode->getChildByID("main-menu")) down.push_back(node);
+        if (auto node = mainNode->getChildByID("left-torch-flame-outline")) left.push_back(node);
+        if (auto node = mainNode->getChildByID("right-torch-flame-outline")) right.push_back(node);
+        if (auto node = mainNode->getChildByID("left-torch-big-glow")) left.push_back(node);
+        if (auto node = mainNode->getChildByID("right-torch-big-glow")) right.push_back(node);
+        if (auto node = mainNode->getChildByID("left-torch-handle")) left.push_back(node);
+        if (auto node = mainNode->getChildByID("right-torch-handle")) right.push_back(node);
+        if (auto node = mainNode->getChildByID("left-torch-small-glow")) left.push_back(node);
+        if (auto node = mainNode->getChildByID("right-torch-small-glow")) right.push_back(node);
+        if (auto node = levelAreaInnerLayer->getChildByType<cocos2d::CCMenu>(0)) left.push_back(node);
+    }
+
+    auto secretLayer2 = m_pOutScene->getChildByType<SecretLayer2>(0);
+    if (secretLayer2) {
+        if (auto node = secretLayer2->getChildByID("textbox-background")) down.push_back(node);
+        if (auto node = secretLayer2->getChildByID("vault-name")) up.push_back(node);
+        if (auto node = secretLayer2->getChildByID("message")) up.push_back(node);
+        if (auto node = secretLayer2->getChildByID("the-challenge-text1")) right.push_back(node);
+        if (auto node = secretLayer2->getChildByID("the-challenge-text2")) right.push_back(node);
+        if (auto node = secretLayer2->getChildByID("diamonds-icon")) right.push_back(node);
+        if (auto node = secretLayer2->getChildByID("diamonds-label")) right.push_back(node);
+        if (auto node = secretLayer2->getChildByID("menu")) scale.push_back(node);
+        if (auto node = secretLayer2->getChildByID("text-box")) down.push_back(node);
+
+        fixMenuAnchorPoint(secretLayer2->getChildByID("menu"));
+    }
+
+    auto gdgLevelLayer = m_pOutScene->getChildByType<LevelLayer>(0);
+    if (gdgLevelLayer) {
+        if (auto node = gdgLevelLayer->getChildByID("side-art-bottom-left")) left.push_back(node);
+        if (auto node = gdgLevelLayer->getChildByID("side-art-bottom-right")) right.push_back(node);
+        if (auto node = gdgLevelLayer->getChildByID("side-art-top-right")) right.push_back(node);
+        if (auto node = gdgLevelLayer->getChildByID("CustomSongWidget")) down.push_back(node);
+        if (auto node = gdgLevelLayer->getChildByID("difficulty-sprite")) left.push_back(node);
+        if (auto node = gdgLevelLayer->getChildByID("stars-label")) left.push_back(node);
+        if (auto node = gdgLevelLayer->getChildByID("stars-icon")) left.push_back(node);
+        if (auto node = gdgLevelLayer->getChildByID("name-label")) up.push_back(node);
+        if (auto node = gdgLevelLayer->getChildByID("author-label")) up.push_back(node);
+        if (auto node = gdgLevelLayer->getChildByID("button-menu")) scale.push_back(node);
+        if (auto node = gdgLevelLayer->getChildByID("back-menu")) left.push_back(node);
+
+        fixMenuAnchorPoint(gdgLevelLayer->getChildByID("button-menu"));
+    }
+
+    if (auto modSettingsPopup = m_pOutScene->getChildByType<ModSettingsPopup>(0)) scale.push_back(modSettingsPopup);
+
+    for (auto node : up) node->runAction(cocos2d::CCEaseExponentialIn::create(cocos2d::CCMoveBy::create(m_fDuration, { 0.f, 150.f })));
+    for (auto node : down) node->runAction(cocos2d::CCEaseExponentialIn::create(cocos2d::CCMoveBy::create(m_fDuration, { 0.f, -150.f })));
+    for (auto node : left) node->runAction(cocos2d::CCEaseExponentialIn::create(cocos2d::CCMoveBy::create(m_fDuration, { -150.f, 0.f })));
+    for (auto node : right) node->runAction(cocos2d::CCEaseExponentialIn::create(cocos2d::CCMoveBy::create(m_fDuration, { 150.f, 0.f })));
+    for (auto node : scale) node->runAction(cocos2d::CCEaseExponentialIn::create(cocos2d::CCScaleBy::create(m_fDuration, 1.5f, 1.5f)));
 }

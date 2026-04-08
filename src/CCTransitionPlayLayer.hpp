@@ -5,4 +5,6 @@ class CCTransitionPlayLayer : public cocos2d::CCTransitionFade {
 public:
     virtual void onEnter() override;
     virtual void onExit() override;
+
+    void animateOutScene();
 };

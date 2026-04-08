@@ -7,7 +7,7 @@
         "ios": "2.2081"
     },
 
-    "version": "v1.0.4",
+    "version": "v1.0.5",
     "id": "undefined0.smooth-level-enter",
     "name": "Smooth Level Enter",
     "developer": "undefined0",
@@ -29,10 +29,16 @@
             "description": "Overrides the length of the transition to force it to be 1 second, regardless of any other mod or ingame setting.",
             "default": true
         },
-        "animate-level-page": {
+        "animate-out-level-page": {
             "name": "Animate Level Page",
             "type": "bool",
             "description": "Whether to animate out the level page.",
+            "default": true
+        },
+        "legacy-easing": {
+            "name": "Legacy Easing",
+            "type": "bool",
+            "description": "Use the legacy Bounce Out easing for blocks in the level, over the newer Exponential Out easing.",
             "default": false
         }
     }
