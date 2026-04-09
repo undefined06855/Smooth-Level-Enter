@@ -1,4 +1,12 @@
 # Smooth Level Enter
+## v1.0.6
+- Added support for editor levels for animating out
+- Fixed shaders setup before the level started
+- Fixed levels with UI set with a UI trigger
+- Fixed The Tower's animations to be more consistent
+- Fixed coins not animating out in The Tower and online level pages
+- Fixed diamonds not animating out in online level pages
+
 ## v1.0.5
 - Added support for The Vault of Secrets, The Tower, GDGuesser's level page and Soggy Icon's settings page for animating out
 - Enabled the animate out setting by default
@@ -7,7 +15,7 @@
 - Adjusted other easings, timings and distances slightly
 
 ## v1.0.4
-- Added an option to animate out the level page (suggested by @skip_way)
+- Added an option to animate out online level pages (suggested by @skip_way)
 
 ## v1.0.3
 - Fixed player 2 being broken initially for levels that didn't start as dual

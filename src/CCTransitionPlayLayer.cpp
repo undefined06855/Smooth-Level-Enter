@@ -27,8 +27,6 @@ void CCTransitionPlayLayer::onEnter() {
 
     auto playLayer = m_pInScene->getChildByType<PlayLayer>(0);
     playLayer->setVisible(true);
-    playLayer->updateVisibility(1.f / 60.f);
-    playLayer->updateShaderLayer(1.f / 60.f);
 
     bool isPlayer2Running = playLayer->m_player2->isRunning();
     setFakeIsRunningRecursive(playLayer->m_player2, true);
@@ -37,6 +35,7 @@ void CCTransitionPlayLayer::onEnter() {
     if (rewindBackground) rewindBackground->setVisible(false);
 
     // m_pInScene animations below (playlayer)
+    auto winSize = cocos2d::CCDirector::get()->getWinSize();
 
     playLayer->m_background->setBlendFunc({ GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA });
     playLayer->m_background->setOpacity(0);
@@ -74,10 +73,17 @@ void CCTransitionPlayLayer::onEnter() {
     auto megahackUI = playLayer->getChildByType<status::Manager>(0);
     if (megahackUI) {
         megahackUI->setAnchorPoint({ .5f, .5f });
-        megahackUI->setPosition(cocos2d::CCDirector::get()->getWinSize() / 2.f);
+        megahackUI->setPosition(winSize / 2.f);
         megahackUI->setScale(0.f);
         megahackUI->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCScaleTo::create(m_fDuration, 1.f)));
     }
+
+    // fix positioning because right now it's at 0, 0 with content size 0, 0
+    playLayer->m_uiTriggerUI->setAnchorPoint({ .5f, .5f });
+    playLayer->m_uiTriggerUI->setPosition(winSize / 2.f);
+    playLayer->m_uiTriggerUI->setContentSize(winSize);
+    playLayer->m_uiTriggerUI->setScale(0.f);
+    playLayer->m_uiTriggerUI->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCScaleTo::create(m_fDuration, 1.f)));
 
     playLayer->m_progressBar->setPositionY(playLayer->m_progressBar->getPositionY() + 30.f);
     playLayer->m_progressBar->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCMoveBy::create(m_fDuration, { 0.f, -30.f })));
@@ -87,6 +93,10 @@ void CCTransitionPlayLayer::onEnter() {
 
     playLayer->m_infoLabel->setPositionX(playLayer->m_infoLabel->getPositionX() - 50.f);
     playLayer->m_infoLabel->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCMoveBy::create(m_fDuration, { 50.f, 0.f })));
+
+    playLayer->m_shaderLayer->m_sprite->setOpacity(0);
+    playLayer->m_shaderLayer->m_sprite->runAction(cocos2d::CCFadeIn::create(m_fDuration));
+    playLayer->m_shaderLayer->m_sprite->setBlendFunc({ GL_CONSTANT_ALPHA, GL_ONE_MINUS_CONSTANT_ALPHA }); // see CCTransitionPlayLayer::draw
 
     // likely not onscreen but should animate anyway
     auto origP1Scale = playLayer->m_player1->getScale(); // may not be 1 if the player starts as mini
@@ -153,6 +163,15 @@ void CCTransitionPlayLayer::onEnter() {
         gradient->runAction(cocos2d::CCFadeTo::create(m_fDuration, origOpacity));
     }
 
+    // scary shaderlayer stuff
+    // if background is included in shaderlayer then force levelinfolayer into it so lens circle works properly
+    // this works surprisingly well as long as nobody else touches it
+    bool isBackgroundIncluded = playLayer->m_shaderLayer->m_state.m_minBlendingLayer <= 1;
+    if (isBackgroundIncluded) {
+        playLayer->m_shaderLayer->m_pChildren->addObject(m_pOutScene);
+        m_pOutScene->setScale(playLayer->m_shaderLayer->m_scaleFactor); // for pixelate shader
+    }
+
     if (geode::Mod::get()->getSettingValue<bool>("animate-out-level-page")) {
         this->animateOutScene();
     }
@@ -161,14 +180,40 @@ void CCTransitionPlayLayer::onEnter() {
         cocos2d::CCDelayTime::create(m_fDuration),
 
         // cleanup
-        geode::cocos::CallFuncExt::create([this, rewindBackground, playLayer, isPlayer2Running] {
+        geode::cocos::CallFuncExt::create([this, rewindBackground, playLayer, isPlayer2Running, isBackgroundIncluded] {
             setFakeIsRunningRecursive(m_pInScene, false);
 
             CCTransitionScene::finish();
             if (rewindBackground) rewindBackground->setVisible(true);
             if (!isPlayer2Running) setFakeIsRunningRecursive(playLayer->m_player2, false);
+            if (isBackgroundIncluded) playLayer->m_shaderLayer->m_pChildren->removeObject(m_pOutScene);
         })
     ));
+
+    this->scheduleUpdate();
+}
+
+void CCTransitionPlayLayer::update(float dt) {
+    auto playLayer = m_pInScene->getChildByType<PlayLayer>(0);
+    playLayer->updateShaderLayer(dt);
+}
+
+void CCTransitionPlayLayer::draw() {
+    auto playLayer = m_pInScene->getChildByType<PlayLayer>(0);
+
+    // this is also for fixing shaderlayer (since the scale of shaderlayer children need to be set for the pixelate shader)
+    // keep in mind we have two of the SAME out scenes drawing - one drawn first, then one put in shaderlayer
+    // so we need to set the scale to 1 while drawing the BACK out scene, then set it to what it was for the FRONT out scene
+    auto origScale = m_pOutScene->getScale();
+    m_pOutScene->setScale(1.f);
+    m_pOutScene->visit();
+    m_pOutScene->setScale(origScale);
+
+    // this is for specifically shaderlayer since the shader doesn't respect the opacity
+    // shaderlayer->m_sprite has blend func set to GL_CONSTANT_ALPHA, GL_ONE_MINUS_CONSTANT_ALPHA
+    glBlendColor(.0f, .0f, .0f, playLayer->m_shaderLayer->m_sprite->getOpacity() / 255.f);
+    m_pInScene->visit();
+    glBlendColor(0.f, 0.f, 0.f, 1.f);
 }
 
 void CCTransitionPlayLayer::onExit() {
@@ -191,14 +236,14 @@ void CCTransitionPlayLayer::animateOutScene() {
     std::vector<cocos2d::CCNode*> right;
     std::vector<cocos2d::CCNode*> scale;
 
-    auto fixMenuAnchorPoint = [](cocos2d::CCNode* menu) {
+    auto fixMenuAnchorPoint = [](cocos2d::CCNode* menu, bool setPositionToCenter = true) {
         if (!menu) return;
 
         std::vector<cocos2d::CCPoint> positions;
         for (int i = 0; i < menu->getChildrenCount(); i++) positions.push_back(menu->convertToWorldSpace(menu->getChildByIndex(i)->getPosition()));
 
         menu->ignoreAnchorPointForPosition(false);
-        menu->setPosition(cocos2d::CCDirector::get()->getWinSize() / 2.f);
+        menu->setPosition(setPositionToCenter ? cocos2d::CCPoint(cocos2d::CCDirector::get()->getWinSize() / 2.f) : cocos2d::CCPoint{ 0.f, 0.f });
 
         for (int i = 0; i < menu->getChildrenCount(); i++) menu->getChildByIndex(i)->setPosition(menu->convertToNodeSpace(positions[i]));
     };
@@ -217,6 +262,11 @@ void CCTransitionPlayLayer::animateOutScene() {
         if (auto node = levelInfoLayer->getChildByID("orbs-label")) right.push_back(node);
         if (auto node = levelInfoLayer->getChildByID("stars-icon")) left.push_back(node);
         if (auto node = levelInfoLayer->getChildByID("stars-label")) left.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("diamonds-icon")) left.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("diamonds-label")) left.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("coin-icon-1")) left.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("coin-icon-2")) left.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("coin-icon-3")) left.push_back(node);
         if (auto node = levelInfoLayer->getChildByID("custom-songs-widget")) down.push_back(node);
         if (auto node = levelInfoLayer->getChildByID("left-side-menu")) left.push_back(node);
         if (auto node = levelInfoLayer->getChildByID("bottom-left-art")) left.push_back(node);
@@ -241,6 +291,29 @@ void CCTransitionPlayLayer::animateOutScene() {
         fixMenuAnchorPoint(levelInfoLayer->getChildByID("play-menu"));
     }
 
+    auto editLevelLayer = m_pOutScene->getChildByType<EditLevelLayer>(0);
+    if (editLevelLayer) {
+        if (auto node = editLevelLayer->getChildByID("level-name-background")) up.push_back(node);
+        if (auto node = editLevelLayer->getChildByID("description-background")) up.push_back(node);
+        if (auto node = editLevelLayer->getChildByID("level-edit-menu")) scale.push_back(node);
+        if (auto node = editLevelLayer->getChildByID("level-length")) down.push_back(node);
+        if (auto node = editLevelLayer->getChildByID("level-song")) down.push_back(node);
+        if (auto node = editLevelLayer->getChildByID("level-verified")) down.push_back(node);
+        if (auto node = editLevelLayer->getChildByID("version-label")) down.push_back(node);
+        if (auto node = editLevelLayer->getChildByID("level-id-label")) down.push_back(node);
+        if (auto node = editLevelLayer->getChildByID("description-menu")) left.push_back(node);
+        if (auto node = editLevelLayer->getChildByID("folder-menu")) left.push_back(node);
+        if (auto node = editLevelLayer->getChildByID("bottom-left-art")) left.push_back(node);
+        if (auto node = editLevelLayer->getChildByID("bottom-right-art")) right.push_back(node);
+        if (auto node = editLevelLayer->getChildByID("back-menu")) left.push_back(node);
+        if (auto node = editLevelLayer->getChildByID("level-actions-menu")) right.push_back(node);
+        if (auto node = editLevelLayer->getChildByID("info-button-menu")) scale.push_back(node);
+        if (auto node = editLevelLayer->getChildByID("level-name-input")) up.push_back(node);
+        if (auto node = editLevelLayer->getChildByID("description-input")) up.push_back(node);
+
+        fixMenuAnchorPoint(editLevelLayer->getChildByID("info-button-menu"));
+    }
+
     auto levelSelectLayer = m_pOutScene->getChildByType<LevelSelectLayer>(0);
     if (levelSelectLayer) {
         if (auto node = levelSelectLayer->getChildByID("ground-layer")) down.push_back(node);
@@ -258,21 +331,11 @@ void CCTransitionPlayLayer::animateOutScene() {
 
     auto levelAreaInnerLayer = m_pOutScene->getChildByType<LevelAreaInnerLayer>(0);
     if (levelAreaInnerLayer) {
-        auto mainNode = levelAreaInnerLayer->getChildByType<cocos2d::CCNode>(0);
+        // this used to list out every node in main-node but i couldnt be bothered
+        if (auto node = levelAreaInnerLayer->getChildByID("main-node")) scale.push_back(node);
+        if (auto node = levelAreaInnerLayer->getChildByID("back-menu")) scale.push_back(node);
 
-        if (auto node = mainNode->getChildByID("background")) down.push_back(node);
-        if (auto node = mainNode->getChildByID("left-torch-flame")) left.push_back(node);
-        if (auto node = mainNode->getChildByID("right-torch-flame")) right.push_back(node);
-        if (auto node = mainNode->getChildByID("main-menu")) down.push_back(node);
-        if (auto node = mainNode->getChildByID("left-torch-flame-outline")) left.push_back(node);
-        if (auto node = mainNode->getChildByID("right-torch-flame-outline")) right.push_back(node);
-        if (auto node = mainNode->getChildByID("left-torch-big-glow")) left.push_back(node);
-        if (auto node = mainNode->getChildByID("right-torch-big-glow")) right.push_back(node);
-        if (auto node = mainNode->getChildByID("left-torch-handle")) left.push_back(node);
-        if (auto node = mainNode->getChildByID("right-torch-handle")) right.push_back(node);
-        if (auto node = mainNode->getChildByID("left-torch-small-glow")) left.push_back(node);
-        if (auto node = mainNode->getChildByID("right-torch-small-glow")) right.push_back(node);
-        if (auto node = levelAreaInnerLayer->getChildByType<cocos2d::CCMenu>(0)) left.push_back(node);
+        fixMenuAnchorPoint(levelAreaInnerLayer->getChildByID("back-menu"));
     }
 
     auto secretLayer2 = m_pOutScene->getChildByType<SecretLayer2>(0);
