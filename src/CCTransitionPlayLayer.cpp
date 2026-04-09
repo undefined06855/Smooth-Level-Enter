@@ -97,6 +97,7 @@ void CCTransitionPlayLayer::onEnter() {
 
     playLayer->m_shaderLayer->m_sprite->setOpacity(0);
     playLayer->m_shaderLayer->m_sprite->runAction(cocos2d::CCFadeIn::create(m_fDuration));
+    auto origShaderLayerBlendFunc = playLayer->m_shaderLayer->m_sprite->getBlendFunc();
     playLayer->m_shaderLayer->m_sprite->setBlendFunc({ GL_CONSTANT_ALPHA, GL_ONE_MINUS_CONSTANT_ALPHA }); // see CCTransitionPlayLayer::draw
 
     // likely not onscreen but should animate anyway
@@ -181,12 +182,14 @@ void CCTransitionPlayLayer::onEnter() {
         cocos2d::CCDelayTime::create(m_fDuration),
 
         // cleanup
-        geode::cocos::CallFuncExt::create([this, rewindBackground, playLayer, isPlayer2Running, isBackgroundIncluded] {
+        geode::cocos::CallFuncExt::create([=, this] {
             setFakeIsRunningRecursive(m_pInScene, false);
 
             // playlayer kind of depends on ui trigger ui to be at 0, 0
             playLayer->m_uiTriggerUI->setPosition({ 0.f, 0.f });
             playLayer->m_uiTriggerUI->setContentSize({ 0.f, 0.f });
+
+            playLayer->m_shaderLayer->m_sprite->setBlendFunc(origShaderLayerBlendFunc);
 
             CCTransitionScene::finish();
             if (rewindBackground) rewindBackground->setVisible(true);
