@@ -1,6 +1,6 @@
 # Smooth Level Enter
 ## v1.0.6
-- Added support for editor levels for animating out
+- Added support to editor levels for animating out
 - Fixed shaders setup before the level started
 - Fixed levels with UI set with a UI trigger
 - Fixed The Tower's animations to be more consistent
