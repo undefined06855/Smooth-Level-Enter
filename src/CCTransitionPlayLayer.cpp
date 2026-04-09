@@ -79,6 +79,7 @@ void CCTransitionPlayLayer::onEnter() {
     }
 
     // fix positioning because right now it's at 0, 0 with content size 0, 0
+    // though this gets reset after the transition finishes
     playLayer->m_uiTriggerUI->setAnchorPoint({ .5f, .5f });
     playLayer->m_uiTriggerUI->setPosition(winSize / 2.f);
     playLayer->m_uiTriggerUI->setContentSize(winSize);
@@ -182,6 +183,10 @@ void CCTransitionPlayLayer::onEnter() {
         // cleanup
         geode::cocos::CallFuncExt::create([this, rewindBackground, playLayer, isPlayer2Running, isBackgroundIncluded] {
             setFakeIsRunningRecursive(m_pInScene, false);
+
+            // playlayer kind of depends on ui trigger ui to be at 0, 0
+            playLayer->m_uiTriggerUI->setPosition({ 0.f, 0.f });
+            playLayer->m_uiTriggerUI->setContentSize({ 0.f, 0.f });
 
             CCTransitionScene::finish();
             if (rewindBackground) rewindBackground->setVisible(true);
