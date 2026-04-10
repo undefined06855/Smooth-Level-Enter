@@ -171,8 +171,12 @@ void CCTransitionPlayLayer::onEnter() {
     bool isBackgroundIncluded = playLayer->m_shaderLayer->m_state.m_minBlendingLayer <= 1;
     if (isBackgroundIncluded) {
         playLayer->m_shaderLayer->m_pChildren->addObject(m_pOutScene);
-        m_pOutScene->setScale(playLayer->m_shaderLayer->m_scaleFactor); // for pixelate shader
     }
+
+    // this is so it can be scaled around the bottom left corner for the pixelate shader if required
+    m_pOutScene->setAnchorPoint({ 0.f, 0.f });
+    m_pOutScene->ignoreAnchorPointForPosition(true);
+    m_pOutScene->setContentSize(winSize);
 
     if (geode::Mod::get()->getSettingValue<bool>("animate-out-level-page")) {
         this->animateOutScene();
@@ -198,30 +202,30 @@ void CCTransitionPlayLayer::onEnter() {
         })
     ));
 
+    playLayer->updateShaderLayer(.01f); // hope nobody cares about losing 0.01s on their fade times
     this->scheduleUpdate();
 }
 
 void CCTransitionPlayLayer::update(float dt) {
     auto playLayer = m_pInScene->getChildByType<PlayLayer>(0);
-    playLayer->updateShaderLayer(dt);
+    playLayer->updateShaderLayer(0.f); // we don't want to advance any fade times more than we need to
 }
 
 void CCTransitionPlayLayer::draw() {
     auto playLayer = m_pInScene->getChildByType<PlayLayer>(0);
 
-    // this is also for fixing shaderlayer (since the scale of shaderlayer children need to be set for the pixelate shader)
     // keep in mind we have two of the SAME out scenes drawing - one drawn first, then one put in shaderlayer
-    // so we need to set the scale to 1 while drawing the BACK out scene, then set it to what it was for the FRONT out scene
-    auto origScale = m_pOutScene->getScale();
-    m_pOutScene->setScale(1.f);
+    // the one put in shaderlayer will be drawn with the correct scale for the pixelate shader
     m_pOutScene->visit();
-    m_pOutScene->setScale(origScale);
 
     // this is for specifically shaderlayer since the shader doesn't respect the opacity
     // shaderlayer->m_sprite has blend func set to GL_CONSTANT_ALPHA, GL_ONE_MINUS_CONSTANT_ALPHA
     glBlendColor(.0f, .0f, .0f, playLayer->m_shaderLayer->m_sprite->getOpacity() / 255.f);
+    m_pOutScene->setScaleX(1.f / (playLayer->m_shaderLayer->m_state.m_pixelateTargetX * playLayer->m_shaderLayer->m_scaleFactor));
+    m_pOutScene->setScaleY(1.f / (playLayer->m_shaderLayer->m_state.m_pixelateTargetY * playLayer->m_shaderLayer->m_scaleFactor));
     m_pInScene->visit();
-    glBlendColor(0.f, 0.f, 0.f, 1.f);
+    m_pOutScene->setScale(1.f);
+    glBlendColor(0.f, 0.f, 0.f, 0.f);
 }
 
 void CCTransitionPlayLayer::onExit() {
@@ -270,8 +274,8 @@ void CCTransitionPlayLayer::animateOutScene() {
         if (auto node = levelInfoLayer->getChildByID("orbs-label")) right.push_back(node);
         if (auto node = levelInfoLayer->getChildByID("stars-icon")) left.push_back(node);
         if (auto node = levelInfoLayer->getChildByID("stars-label")) left.push_back(node);
-        if (auto node = levelInfoLayer->getChildByID("diamonds-icon")) left.push_back(node);
-        if (auto node = levelInfoLayer->getChildByID("diamonds-label")) left.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("diamond-icon")) left.push_back(node);
+        if (auto node = levelInfoLayer->getChildByID("diamond-label")) left.push_back(node);
         if (auto node = levelInfoLayer->getChildByID("coin-icon-1")) left.push_back(node);
         if (auto node = levelInfoLayer->getChildByID("coin-icon-2")) left.push_back(node);
         if (auto node = levelInfoLayer->getChildByID("coin-icon-3")) left.push_back(node);

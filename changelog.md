@@ -1,11 +1,19 @@
 # Smooth Level Enter
+## v1.0.7
+- Fixed levels which started with the pixelate shader active
+- Fixed shaders looking inconsistent at the start between vanilla and this mod
+- Fixed the level page looking scaled up on mobile for levels which started with a shader
+- Fixed diamonds not animating out for online level pages
+- Improved mod compatbility for mods that depended on glBlendColor being the correct default
+- Reworded some parts of the changelog
+
 ## v1.0.6
 - Added support to editor levels for animating out
 - Fixed shaders setup before the level started
 - Fixed levels with UI set with a UI trigger
 - Fixed The Tower's animations to be more consistent
-- Fixed coins not animating out in The Tower and online level pages
-- Fixed diamonds not animating out in online level pages
+- Fixed coins not animating out for The Tower and online level pages
+- Fixed diamonds not animating out for online level pages
 
 ## v1.0.5
 - Added support for The Vault of Secrets, The Tower, GDGuesser's level page and Soggy Icon's settings page for animating out
@@ -28,7 +36,7 @@
 - Added the override length setting
 
 ## v1.0.1
-- Fixed levels that don't have a middleground from crashing
+- Fixed levels that don't have a middleground crashing
 
 ## v1.0.0
 - Initial release
