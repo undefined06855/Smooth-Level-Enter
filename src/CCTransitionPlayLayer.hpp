@@ -7,7 +7,10 @@ public:
     virtual void onEnter() override;
     virtual void onExit() override;
     virtual void draw() override;
+    // virtual void visit() override { kmGLPushMatrix(); this->transform(); this->draw(); kmGLPopMatrix(); }
     virtual void update(float dt) override;
 
     void animateOutScene();
+    bool walkInPlayer(PlayerObject* player, IconType gamemode); // returns true if the player was walked out
+    void createWalkInAnimation(PlayerObject* player, float distance, cocos2d::CCActionInterval** moveRightAction);
 };

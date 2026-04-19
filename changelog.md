@@ -1,4 +1,7 @@
 # Smooth Level Enter
+## v1.0.8
+- Added four random animations for when the player starts onscreen (either in a platformer level, or from a StartPos)
+
 ## v1.0.7
 - Fixed levels which started with the pixelate shader active
 - Fixed shaders looking inconsistent at the start between vanilla and this mod

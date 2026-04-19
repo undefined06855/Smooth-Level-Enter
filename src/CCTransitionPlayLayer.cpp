@@ -100,18 +100,25 @@ void CCTransitionPlayLayer::onEnter() {
     auto origShaderLayerBlendFunc = playLayer->m_shaderLayer->m_sprite->getBlendFunc();
     playLayer->m_shaderLayer->m_sprite->setBlendFunc({ GL_CONSTANT_ALPHA, GL_ONE_MINUS_CONSTANT_ALPHA }); // see CCTransitionPlayLayer::draw
 
-    // likely not onscreen but should animate anyway
-    auto origP1Scale = playLayer->m_player1->getScale(); // may not be 1 if the player starts as mini
-    playLayer->m_player1->setScale(0.f);
-    playLayer->m_player1->setRotation(-20.f);
-    playLayer->m_player1->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCScaleTo::create(m_fDuration, origP1Scale)));
-    playLayer->m_player1->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCRotateTo::create(m_fDuration, 0.f)));
+    auto startMode = (IconType)playLayer->m_levelSettings->m_startMode;
+    if (playLayer->m_startPosObject) startMode = (IconType)playLayer->m_startPosObject->m_startSettings->m_startMode;
 
-    auto origP2Scale = playLayer->m_player2->getScale();
-    playLayer->m_player2->setScale(0.f);
-    playLayer->m_player2->setRotation(20.f);
-    playLayer->m_player2->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCScaleTo::create(m_fDuration, origP2Scale)));
-    playLayer->m_player2->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCRotateTo::create(m_fDuration, 0.f)));
+    // walkInPlayer returns false if the player shouldn't walk in (likely offscreen already)
+    if (!this->walkInPlayer(playLayer->m_player1, startMode)) {
+        auto origP1Scale = playLayer->m_player1->getScale(); // may not be 1 if the player starts as mini
+        playLayer->m_player1->setScale(0.f);
+        playLayer->m_player1->setRotation(-20.f);
+        playLayer->m_player1->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCScaleTo::create(m_fDuration, origP1Scale)));
+        playLayer->m_player1->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCRotateTo::create(m_fDuration, 0.f)));
+    }
+
+    if (!this->walkInPlayer(playLayer->m_player2, startMode)) {
+        auto origP2Scale = playLayer->m_player2->getScale();
+        playLayer->m_player2->setScale(0.f);
+        playLayer->m_player2->setRotation(20.f);
+        playLayer->m_player2->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCScaleTo::create(m_fDuration, origP2Scale)));
+        playLayer->m_player2->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCRotateTo::create(m_fDuration, 0.f)));
+    }
 
     // objects
     auto screenWidth = cocos2d::CCDirector::get()->getWinSize().width;
@@ -389,4 +396,174 @@ void CCTransitionPlayLayer::animateOutScene() {
     for (auto node : left) node->runAction(cocos2d::CCEaseExponentialIn::create(cocos2d::CCMoveBy::create(m_fDuration, { -150.f, 0.f })));
     for (auto node : right) node->runAction(cocos2d::CCEaseExponentialIn::create(cocos2d::CCMoveBy::create(m_fDuration, { 150.f, 0.f })));
     for (auto node : scale) node->runAction(cocos2d::CCEaseExponentialIn::create(cocos2d::CCScaleBy::create(m_fDuration, 1.5f, 1.5f)));
+}
+
+bool CCTransitionPlayLayer::walkInPlayer(PlayerObject* player, IconType gamemode) {
+    if (!player->getParent()) return false;
+
+    auto playerPos = player->getParent()->convertToWorldSpace(player->getPosition());
+    auto winSize = cocos2d::CCDirector::get()->getWinSize();
+    if (playerPos.x + 15.f < 0.f) return false;
+    if (playerPos.x - 15.f > winSize.width) return false;
+    if (playerPos.y + 15.f > winSize.height) return false;
+    if (playerPos.y - 15.f < 0.f) return false;
+
+    auto endX = player->getPositionX();
+    float startX;
+    if (playerPos.x < winSize.width / 2.f) {
+        // player is more to the left
+        startX = std::min(playerPos.x - 134.f, -16.f); // either offset 134 units back or fixed 16 units back, whichever is further left
+    } else {
+        // player is more to the right
+        startX = std::max(playerPos.x + 134.f, winSize.width + 16.f);
+    }
+    startX = player->getParent()->convertToNodeSpace({ startX, 0.f }).x;
+
+    auto distance = endX - startX;
+
+    player->setPositionX(startX);
+
+    cocos2d::CCActionInterval* moveRightAction = cocos2d::CCMoveBy::create(m_fDuration, { distance, 0.f });
+
+    switch (gamemode) {
+        // run in
+        case IconType::Robot: {
+            player->m_robotSprite->runAnimationForced("run");
+        } break;
+
+        // walk in
+        case IconType::Spider: {
+            player->m_spiderSprite->runAnimationForced("walk");
+        } break;
+
+        // rotate in
+        case IconType::Ball: {
+            // s=r*theta or something so angle in radians=distance/radius
+            player->runAction(cocos2d::CCEaseBackOut::create(cocos2d::CCRotateBy::create(m_fDuration, distance / (30.f * player->m_vehicleSize) * kmPIUnder180)));
+            moveRightAction = cocos2d::CCEaseBackOut::create(moveRightAction);
+        } break;
+
+        // pick a random enter animation
+        case IconType::Ship:
+        case IconType::Ufo:
+        case IconType::Swing:
+        case IconType::Wave:
+        case IconType::Cube: {
+            this->createWalkInAnimation(player, distance, &moveRightAction);
+        } break;
+
+        // wtf
+        case IconType::Item:
+        case IconType::Special:
+        case IconType::DeathEffect:
+        case IconType::ShipFire:
+        case IconType::Jetpack: // (jetpack uses IconType::Ship)
+            break;
+    }
+
+    player->runAction(moveRightAction);
+
+    return true;
+}
+
+// this doesn't and probably won't ever support the player being rotated
+// it's not like this runs very often anyway how often does the player start onscreen
+void CCTransitionPlayLayer::createWalkInAnimation(PlayerObject* player, float distance, cocos2d::CCActionInterval** moveRightAction) {
+    auto forceAnchorPoint = [player](cocos2d::CCPoint pos) {
+        auto size = 30.f * player->m_vehicleSize;
+        player->setContentSize({ size, size });
+        player->setAnchorPoint(pos - cocos2d::CCPoint{ .5f, .5f });
+        player->ignoreAnchorPointForPosition(true);
+    };
+
+    auto resetAnchorPoint = [player]() {
+        player->setContentSize({ 0.f, 0.f });
+        player->setAnchorPoint({ .5f, .5f });
+        player->ignoreAnchorPointForPosition(false);
+    };
+
+    auto moveRightDurationLength = m_fDuration * .5f;
+
+    switch (geode::utils::random::generate(0, 4)) {
+        case 0: {
+            // jump
+            auto jumpDuration = m_fDuration * .5f;
+            auto squishDuration = m_fDuration * .25f;
+
+            player->setRotation(-180.f);
+            player->runAction(cocos2d::CCSequence::create(
+                cocos2d::CCSpawn::createWithTwoActions(
+                    cocos2d::CCRotateBy::create(jumpDuration, 180.f),
+                    cocos2d::CCSequence::createWithTwoActions(
+                        cocos2d::CCEaseSineOut::create(cocos2d::CCMoveBy::create(jumpDuration / 2.f, { 0.f, 64.f * player->m_vehicleSize })),
+                        cocos2d::CCEaseSineIn::create(cocos2d::CCMoveBy::create(jumpDuration / 2.f, { 0.f, -64.f * player->m_vehicleSize }))
+                    )
+                ),
+                geode::cocos::CallFuncExt::create([forceAnchorPoint] {
+                    // set the anchor point to the bottom middle so we can scale around that point
+                    forceAnchorPoint({ .5f, 0.f });
+                }),
+                cocos2d::CCEaseExponentialOut::create(cocos2d::CCScaleTo::create(squishDuration / 2.f, 1.4f, .7f)),
+                cocos2d::CCEaseExponentialOut::create(cocos2d::CCScaleTo::create(squishDuration / 2.f, 1.f, 1.f)),
+                geode::cocos::CallFuncExt::create(resetAnchorPoint),
+                nullptr
+            ));
+        } break;
+
+        case 1: {
+            // rotate in
+            auto rotateDuration = m_fDuration * .5f;
+            auto resetDuration = m_fDuration * .5f;
+
+            player->runAction(cocos2d::CCSequence::createWithTwoActions(
+                cocos2d::CCRotateBy::create(rotateDuration, distance / (30.f * player->m_vehicleSize) * kmPIUnder180),
+                cocos2d::CCSpawn::createWithTwoActions(
+                    cocos2d::CCRotateTo::create(resetDuration, 0.f),
+                    cocos2d::CCSequence::createWithTwoActions(
+                        cocos2d::CCEaseExponentialOut::create(cocos2d::CCMoveBy::create(resetDuration / 2.f, { 0.f, 30.f })),
+                        cocos2d::CCEaseExponentialIn::create(cocos2d::CCMoveBy::create(resetDuration / 2.f, { 0.f, -30.f }))
+                    )
+                )
+            ));
+        } break;
+
+        case 2: {
+            // throw in
+            auto throwDuration = m_fDuration * .8f;
+            auto squishDuration = m_fDuration * .2f;
+
+            auto origY = player->getPositionY();
+            auto newY = player->getParent()->convertToNodeSpace({ 0.f, -80.f }).y;
+            player->setPositionY(newY);
+            player->setRotation(-180.f);
+
+            player->runAction(cocos2d::CCSequence::create(
+                cocos2d::CCSpawn::createWithTwoActions(
+                    cocos2d::CCRotateBy::create(throwDuration, -540.f),
+                    cocos2d::CCSequence::createWithTwoActions(
+                        cocos2d::CCEaseSineOut::create(cocos2d::CCMoveBy::create(throwDuration * .625f, { 0.f, (origY - newY) + 60.f })),
+                        cocos2d::CCEaseSineIn::create(cocos2d::CCMoveBy::create(throwDuration * .375f, { 0.f, -60.f }))
+                    )
+                ),
+
+                // see above
+                geode::cocos::CallFuncExt::create([forceAnchorPoint] { forceAnchorPoint({ .5f, 0.f }); }),
+                cocos2d::CCEaseExponentialOut::create(cocos2d::CCScaleTo::create(squishDuration / 2.f, 1.2f, .9f)),
+                cocos2d::CCEaseExponentialOut::create(cocos2d::CCScaleTo::create(squishDuration / 2.f, 1.f, 1.f)),
+                geode::cocos::CallFuncExt::create(resetAnchorPoint),
+                nullptr
+            ));
+
+            moveRightDurationLength = throwDuration;
+            *moveRightAction = cocos2d::CCEaseSineInOut::create(*moveRightAction);
+        } break;
+
+        case 3: {
+            // boring slide in
+            moveRightDurationLength = m_fDuration;
+            *moveRightAction = cocos2d::CCEaseExponentialOut::create(*moveRightAction);
+        } break;
+    }
+
+    (*moveRightAction)->m_fDuration = moveRightDurationLength;
 }
