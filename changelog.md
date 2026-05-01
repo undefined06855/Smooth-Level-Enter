@@ -1,4 +1,7 @@
 # Smooth Level Enter
+## v1.0.9
+- Fixed player scaling issues with levels where the player starts as mini
+
 ## v1.0.8
 - Added four random animations for when the player starts onscreen (either in a platformer level, or from a StartPos)
 

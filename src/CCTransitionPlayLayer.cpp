@@ -20,7 +20,17 @@ void CCTransitionPlayLayer::onEnter() {
         m_fDuration = 1.f;
     }
 
+#ifdef NDEBUG
     cocos2d::CCTouchDispatcher::get()->setDispatchEvents(false);
+#else
+    cocos2d::CCTouchDispatcher::get()->setDispatchEvents(true);
+#endif
+
+    auto fakeChildren = cocos2d::CCArray::createWithCapacity(2);
+    fakeChildren->addObject(m_pOutScene);
+    fakeChildren->addObject(m_pInScene);
+    this->setUserObject("geode.devtools/extra-children", fakeChildren);
+
     m_pOutScene->onExitTransitionDidStart();
     m_pInScene->resumeSchedulerAndActions(); // call instead of onEnter
     setFakeIsRunningRecursive(m_pInScene, true);
@@ -104,21 +114,23 @@ void CCTransitionPlayLayer::onEnter() {
     if (playLayer->m_startPosObject) startMode = (IconType)playLayer->m_startPosObject->m_startSettings->m_startMode;
 
     // walkInPlayer returns false if the player shouldn't walk in (likely offscreen already)
-    if (!this->walkInPlayer(playLayer->m_player1, startMode)) {
-        auto origP1Scale = playLayer->m_player1->getScale(); // may not be 1 if the player starts as mini
-        playLayer->m_player1->setScale(0.f);
-        playLayer->m_player1->setRotation(-20.f);
-        playLayer->m_player1->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCScaleTo::create(m_fDuration, origP1Scale)));
-        playLayer->m_player1->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCRotateTo::create(m_fDuration, 0.f)));
-    }
+    // if (!this->walkInPlayer(playLayer->m_player1, startMode)) {
+        // auto origP1Scale = playLayer->m_player1->getScale(); // may not be 1 if the player starts as mini
+        // playLayer->m_player1->setScale(0.f);
+        // playLayer->m_player1->setRotation(-20.f);
+        // playLayer->m_player1->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCScaleTo::create(m_fDuration, origP1Scale)));
+        // playLayer->m_player1->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCRotateTo::create(m_fDuration, 0.f)));
+    // }
+    this->walkInPlayer(playLayer->m_player1, startMode);
 
-    if (!this->walkInPlayer(playLayer->m_player2, startMode)) {
-        auto origP2Scale = playLayer->m_player2->getScale();
-        playLayer->m_player2->setScale(0.f);
-        playLayer->m_player2->setRotation(20.f);
-        playLayer->m_player2->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCScaleTo::create(m_fDuration, origP2Scale)));
-        playLayer->m_player2->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCRotateTo::create(m_fDuration, 0.f)));
-    }
+    // if (!this->walkInPlayer(playLayer->m_player2, startMode)) {
+    //     auto origP2Scale = playLayer->m_player2->getScale();
+    //     playLayer->m_player2->setScale(0.f);
+    //     playLayer->m_player2->setRotation(20.f);
+    //     playLayer->m_player2->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCScaleTo::create(m_fDuration, origP2Scale)));
+    //     playLayer->m_player2->runAction(cocos2d::CCEaseExponentialOut::create(cocos2d::CCRotateTo::create(m_fDuration, 0.f)));
+    // }
+    this->walkInPlayer(playLayer->m_player2, startMode);
 
     // objects
     auto screenWidth = cocos2d::CCDirector::get()->getWinSize().width;
@@ -175,6 +187,7 @@ void CCTransitionPlayLayer::onEnter() {
     // scary shaderlayer stuff
     // if background is included in shaderlayer then force levelinfolayer into it so lens circle works properly
     // this works surprisingly well as long as nobody else touches it
+    // keep in mind this is not correct if the z orders are updated
     bool isBackgroundIncluded = playLayer->m_shaderLayer->m_state.m_minBlendingLayer <= 1;
     if (isBackgroundIncluded) {
         playLayer->m_shaderLayer->m_pChildren->addObject(m_pOutScene);
@@ -403,10 +416,10 @@ bool CCTransitionPlayLayer::walkInPlayer(PlayerObject* player, IconType gamemode
 
     auto playerPos = player->getParent()->convertToWorldSpace(player->getPosition());
     auto winSize = cocos2d::CCDirector::get()->getWinSize();
-    if (playerPos.x + 15.f < 0.f) return false;
-    if (playerPos.x - 15.f > winSize.width) return false;
-    if (playerPos.y + 15.f > winSize.height) return false;
-    if (playerPos.y - 15.f < 0.f) return false;
+    if (playerPos.x <= -15.f) return false;
+    if (playerPos.x >= winSize.width + 15.f) return false;
+    if (playerPos.y >= winSize.height + 15.f) return false;
+    if (playerPos.y <= -15.f) return false;
 
     auto endX = player->getPositionX();
     float startX;
