@@ -1,4 +1,7 @@
 # Smooth Level Enter
+## v1.1.1
+- Fixed M1 Mac crashing when entering levels
+
 ## v1.1.0
 - Added Geode v6 and GD 2.2091 support!
 
